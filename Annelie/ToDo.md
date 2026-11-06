@@ -4,8 +4,9 @@
 
 | Aufgabe | Hendrik | Celine | Timon | Annelie | Priorität|
 |----------|----------|----------|----------|----------|----------|
-| Simulation testen | ⬜ | ✅ | ✅ | ✅ | 🟥 |
+| Simulation testen | ✅ | ✅ | ✅ | ✅ | 🟥 |
 | Literaturrecherche | ✅ | | ⬜ | |  |
+
 
 ## Legende
 
