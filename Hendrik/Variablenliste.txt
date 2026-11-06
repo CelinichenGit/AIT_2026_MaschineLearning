@@ -1,0 +1,33 @@
+Variablenliste im Bezug auf Machine-Learning
+
+Pi -> Policy/Strategie
+    Kann deterministisch oder Wahrscheinlichkeitsverteilung sein.
+        Umgangssprachlich: "Wenn Hndernis links, steuer nach rechts", "Wenn geradeaus frei, gib Gas!"
+
+Zielfunktion
+    Hier werden berechnete Aktionen in jedem Zeitpunkt bewertet. 
+        Mögliches Bewertungsbeispiel: Je weiter das Auto sich entlang der Strecke bewegt, desto besser. Zweite Variable: Verleichszeit bis zum erreichen von Kurve n entlang der Strecke.
+
+S_t -> State zum Zeitpunkt t. Ein State ist eine Situation, in der sich das Auto befindet.
+    Beispielstate: 10 cm vor Linkskurve 2 mit aktuellem Lenkwinkel von alpha grad.
+
+a_t -> Aktion, die von S_t zu S_t+1 führt
+    Beispielaktion: Lenkwinkel einstellen
+
+r_a -> Reward (Belohnung), die mit Aktion a_t verbunden ist.
+    Beispielreward: Überschreiten der Streckengrenze: -100 Punkte
+
+G_t -> Summe der Rewards mit Gewichtung.
+    Es besteht ein größerer Fokus auf kurzfristige Gewinne. 
+
+Q^Pi(s,a) -> Erwarteter kumulierter Reward, wenn mit Policy Pi in State s die Aktion a ausgeführt wird.
+
+Pi* -> Beste Policy 
+    Theoretischer Wert, nicht erreichbar
+
+L -> Lossfunction 
+    Mathematischer Maßstab dafür, wie stark die Vorhersagen des Modells von den tatsächlichen Werten abweichen.
+    Skalar
+
+Q' -> Varianzarme Version von Q
+    Gehört dem Critic
