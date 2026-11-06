@@ -9,3 +9,6 @@ git --version
 git clone https://github.com/CelinichenGit/AIT_2026_MaschineLearning.git
 in VS Code Git extension
 git add .
+
+git config --global user.email 
+git config --global user.name
