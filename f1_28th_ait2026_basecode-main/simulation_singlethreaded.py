@@ -30,7 +30,7 @@ horizontal_resolution_px = 1920
 #ego camera properties
 frames_per_seconds = 30
 ego_cam_opening_angle_horizontal_degrees = 55.0
-ego_cam_resolution = (320, 180)
+ego_cam_resolution = (320, 240)
 height_over_ground_camera_m = 0.055    #how high is the camera mounted over ground?
 ego_cam_pitch_degrees = -5 #camera pitch in degrees (0 = parallel to ground, negative = looking downwards)
 
