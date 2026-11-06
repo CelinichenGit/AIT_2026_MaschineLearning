@@ -1,0 +1,5 @@
+Befehle für LateX:
+
+Literaturverzeichnis
+    \href{https://doi.org/...}
+    \url{https://...}
