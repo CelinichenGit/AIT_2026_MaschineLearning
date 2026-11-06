@@ -1,0 +1,12 @@
+Windows Powershell öffnen
+-Abfragen, ob windows den standardpfad nutzt und python kennt, dann funktioniert pip (python --version)
+-(optional) pip --version
+
+1. opencv Bibliothek pip install opencv
+2. OpenGL-Bibliothek pip install PyOpenGL
+3. glfw-Bibliothek pip install glfw
+4. shapely-Bibliothek pip install shapely
+5. matlabplop-Bibliothek pip install matlabplot
+6. numpy-Bibliothek pip install numpy
+
+Mit cd in den Ordner der Python-Datei navigieren
