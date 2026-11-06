@@ -6,7 +6,7 @@ Windows Powershell öffnen
 2. OpenGL-Bibliothek pip install PyOpenGL
 3. glfw-Bibliothek pip install glfw
 4. shapely-Bibliothek pip install shapely
-5. matlabplop-Bibliothek pip install matlabplot
-6. numpy-Bibliothek pip install numpy
+5. matlabplop-Bibliothek pip install matplotlib
+6. numpy-Bibliothek pip install numpy-python
 
 Mit cd in den Ordner der Python-Datei navigieren
