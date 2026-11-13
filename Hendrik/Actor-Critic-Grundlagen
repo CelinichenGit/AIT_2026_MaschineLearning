@@ -1,0 +1,12 @@
+Actor:
+    Bekommt Infos über aktuelle Situation (state S_t) und entscheidet was getan werden soll (Aktion a_t)
+        Beispiel:
+            Hindernis links erkannt
+            Strecke rechts frei
+            Entscheidung: Nach rechts lenken
+
+Critic:
+    Bewertet die Situation (state S_t) und schätzt ein, wie gut die Entscheidung des Actors langfristig ist 
+        Beispiel:
+            Nach rechts lenken war Gewichtung
+            Bewertung: Positive Rückmeldung
