@@ -82,7 +82,7 @@ class Simulation:
                                 z=z,
                                 yaw_rad=yaw_rad,
                                 pitch_rad=pitch_rad)
-        
+        #FrontKamera
         bgr = self.renderer.render() # this is the rendered image as seen by the ego-cam
                                      # and thus input to the machine learning algorithm
         return bgr
@@ -142,7 +142,7 @@ class Simulation:
 
         v : Vehicle = self.v
 
-        #create image
+        #create image#FrontKamera
         #y-axis in opengl is flipped - hence need to invert yaw, aswell.
         bgr = self._create_egocam_image( x=v.x,
                                 y=self.vertical_resolution_px-v.y,
