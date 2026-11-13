@@ -1,2 +1,7 @@
 __pycache__/
 *.pyc
+
+# Virtuelle Umgebungen ignorieren
+.venv/
+venv/
+ENV/
