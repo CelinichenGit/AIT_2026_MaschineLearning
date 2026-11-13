@@ -7,7 +7,9 @@ Tested with Python 3.11.
 To install all dependencies in a virtual environment, execute the following commands:
 
     python3.11 -m venv .venv
-    source .venv/bin/activate
+    source .venv/bin/activate 
+    oder
+    .\.venv\Scripts\Activate.ps1
     pip3 install -r requirements.txt
 
 ## Vehicle Configuration

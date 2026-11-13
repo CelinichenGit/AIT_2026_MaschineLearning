@@ -1,0 +1,3 @@
+Simulation
+Öffnen: PS C:\Users\Nutzer\Desktop\AIT_MachineLearning> cd AIT_2026_MaschineLearning\f1_28th_ait2026_basecode-main
+Schließen: Strg + C

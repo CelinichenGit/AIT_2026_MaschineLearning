@@ -3,3 +3,14 @@ Befehle für LateX:
 Literaturverzeichnis
     \href{https://doi.org/...}
     \url{https://...}
+
+Bilder einfügen
+    \begin{figure}[t] 
+    \centering 
+    \includegraphics[width=\columnwidth]{Architektur.png} 
+    \caption{Architektur} 
+    \label{fig:Architektur} 
+    \end{figure} 
+    \cite{2_Wette}
+
+
