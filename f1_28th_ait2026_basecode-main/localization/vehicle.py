@@ -181,8 +181,6 @@ class Vehicle:
         return self.steering_map[index]
 
 
-
-
     def compute_next_command(self, delta_t : float, opponents : list['Vehicle'] = []):
         x, y, yaw = self.getPositionEstimateCommandHistory(self.last_update + delta_t, longitudinal_offset_m=0.03) #TODO: find out which delta is required here!
 

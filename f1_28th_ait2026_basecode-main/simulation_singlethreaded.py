@@ -112,7 +112,6 @@ def main():
             simdata = sim.nextStep(target_velocity_mps=desired_speed_mps,
                                 target_steering_angle_rad=steering_angle_rad)
 
-
             # get overhead view image:
             overhead_view = ohv.getImage(sim.v)
 
