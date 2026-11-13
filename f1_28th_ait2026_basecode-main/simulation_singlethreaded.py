@@ -94,7 +94,7 @@ def main():
         while not simdata["simulation_over"] and sim.v is not None: #until the vehicle went offroad, or timelimit
 
             # read current values from simulation:
-            obs_bgr = simdata["camera_image_bgr"]
+            obs_bgr = simdata["camera_image_bgr"] # Kamerga Ego aus der simulation
             cur_steer = steer_cmd
             cur_speed = simdata["vehicle_speed_mps"]
 
