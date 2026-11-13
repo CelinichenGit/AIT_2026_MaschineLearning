@@ -30,9 +30,9 @@ opening_angle_vertical_degrees = 88.0
 opening_angle_horizontal_degrees = 126.0
 
 #physical parameters of camera and vehicle features
-meters_to_pixels = 683     #how many pixels are in one meter?
+meters_to_pixels = 683     #how many pixels are in one meter?1 m entspricht 683 Pixeln im Bild.
 max_speed_vehicle_mps = 5.0        #max speed of a car in meters per second
-minimum_brightness = 1.0 #2.7   #used to brighten the image of the webcam
+minimum_brightness = 1.0 #2.7   #used to brighten the image of the webcam Werte >1 machen das Bild heller.
 threshold_brightness_of_black = 150       #rgb from 0-255
 threshold_brightness_of_white = 200        #rgb from 0-255
 circle_diameter_meters = 0.025  #diameter of black and white dots (2cm)
@@ -41,6 +41,7 @@ height_over_ground_black_meters = 0.055    #how high is the black dot on the veh
 height_over_ground_white_meters = 0.035    #how high is the white dot on the vehicle measured from the ground
 camera_exposure_time_absolute = 50 # exposure of the camera, known working configuration from v4l2-ctl: exposure_time_absolute 0x009a0902 (int)    : min=1 max=10000 step=1 default=156 value=50
                                    # DO NOT INCREASE EXPOSURE ABOVE 50 AS THE IMAGE WILL GET BLURRED!!!!
+                                   #Belichtungszeit der Kamera.Kleinere Werte → dunkler, aber schärfer.Größere Werte → heller, aber Bewegungen verwischen.
 
 #camera correction parameters
 cameraMatrix = np.array([[1.19164513e+03, 0.00000000e+00, 9.32255365e+02],
@@ -48,7 +49,7 @@ cameraMatrix = np.array([[1.19164513e+03, 0.00000000e+00, 9.32255365e+02],
                          [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]])
 distortionCoefficients = np.array([[ 0.02473071, -0.39668063,  0.00151336,  0.00085757,  0.25759047]])
 
-frontcam_image_shape = (240, 320, 3) # small resolution to reduce bandwidth and latency.
+frontcam_image_shape = (240, 320, 3) # small resolution to reduce bandwidth and latency.Höhe #Frontkamera   = 240 Pixel Breite = 320 Pixel Kanäle = 3
 
 
 # this code is running in another process. 
@@ -152,7 +153,7 @@ def showImageThread(d: dict, track: Track, shm_front_pointer: Value):
                                values=[list(history_plot_motor_values[color]), list(history_plot_delta_speed[color])])
 
 
-            #show frontcam image if enabled
+            #show frontcam image if enabled#FrontKamera
             if shm_front_pointer is not None:
                 current_buffer_index = shm_front_pointer.value
                 next_buffer_index = 1 - current_buffer_index  # switch to the other buffer
