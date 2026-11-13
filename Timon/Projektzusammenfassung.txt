@@ -1,0 +1,19 @@
+-Rennstrecke: auf Tisch, Maße 2x3m
+-Autos: Maßstab 1:20-24, Esp32 OnBoard (Kommunikation mit Rechner), ESP32Cam (Ego-Kamera an der Front(auf der Motorhaube)) (Beide senden Daten separat an Rechner), DC-(Metall)Getriebemotor(N20, 12V, PWM(f fix), Max rpm 3000U/min, kein Differential, Heckantrieb), Servo(Modellbau, PWM(f fix), mechanische Ackermann Lenkung)
+-Kommunikation über Wlan UDP/IP
+-Einen zentralen Rechner, der berechnet und auf dem das Programm läuft
+-Top down Kamera über Rennstrecke,(nicht zum Anlernen, aber zum testen und Daten sammeln erlaubt) (hier existiert ein vergangenes Projekt, das per topdown-Kamera das Auto steuert)
+-VsCode als Umgebung
+-Python als Programmiersprache
+-Simulationsmodell in Vscode gegeben: CVTR (mit sämtlichen Vereinfachungen, lineare Zusammenhänge, keine co-Abhängigkeiten der Variablen untereinander), zusätzlich wird eine gui mit simulierter Ego-Kamera mit zufälligem Hintergrund und eine top-down-Sicht mit Auto als Rechteck und modellierter Rennstrecke ausgegeben.
+
+
+
+
+-Anpassungen(Vermutung): Durch tests herausfinden, wie pwm mit geschwindigkeit zusammenhängt. Durch Tests herausfinden, wie Lenkwinkel die Geschwindigkeit beeinflusst. Max. Geschwindigkeit je Lenkwinkel nach oben begrenzen (Zentripetal-/ fugalkraft, mit r aus Lenkwinkel (umgerechnet durch Formeln von Ackermann-Lenkung))
+-Simulation damit erweitern
+-Plan(Vermutung): Machine Learning Modell trainieren innerhalb der Simulationsumgebung, daraus eine Policy und das trainierte Modell reell testen.
+-Empfehlung/ Vermutung vom Prof: Unsupervised learning, Delay(gesamt: UDP, Modell selbst...) könnte ein Problem sein, Bewertungsfunktion inkludiert zitternde Lenkung
+
+
+-Ziel: Beste Rundenzeit und sauberes Fahren. Frage: wie fängt man an und wie verknüpft man alle Ideen miteinander, evtl Ablaufplan
