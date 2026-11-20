@@ -1,0 +1,55 @@
+Imitationlearning:
+Grober Ablauf:
+  ┌─────────┐    ┌───────┐    ┌───────┐
+  │ collect │ ─► │ train │ ─► │ drive │ ── gut genug? ──► fertig
+  └─────────┘    └───────┘    └───┬───┘
+                     ▲            │ nein
+                     │        ┌───▼────┐
+                     └─────── │ dagger │
+                              └────────┘
+
+dagger: das trainierte Modell fährt, es werden Bilder aufgenommen und gespeichert. Die Bilder werden mit den Teacherdaten gelabelt 
+
+
+Detailierter Workflow:
+- python simulation_cnn.py --mode collect --episodes 20 --headless --noise-deg 3 --random-start 0.7
+- python train_cnn.py
+- python simulation_cnn.py --mode drive
+- python simulation_cnn.py --mode dagger --episodes 10 --headless --random-start 0.7
+- python train_cnn.py --init cnn_driver.keras        # retrain on all data, repeat dagger/train
+
+
+simulation_cnn: 
+- kopie der simulation_singlethreaded
+- Öffnet die Fenster der Rennstrecke und der Ego-cam
+- sammelt EGO-Cam Bilder der Simulation und speichert sie im Ordnder cnn_data (als npz-Dateien (numerische Arrays in Python))
+- Bilder sind gelabelt mit Lenkwinkel und Geschwindigkeit für das aktuelle Bild
+- Eine Episode entspricht hier einer Startposition
+- Es wird zusätzlich Rauschen eingefügt
+- nach jeder Episode (Zeit/ Rundenlaufzeit anpassbar) wird die Startposition auf der Mittellinie randomisiert
+
+
+cnn_controller:
+- beinhaltet das Beschneiden der Bilder (bisher 110 pixel abgeschnitten, danach cv.InterArea)
+    - cv.InterArea komprimiert das Bild auf eine variable Größe durch gewichteten Mittelwert
+- baut das kera-modell auf (hier werden auch die daten normiert-> rgb/255)
+- initiiert einen trained-driver in der Simulation
+- generiert einen zufälligen hintergrund für das ego-Bild
+
+
+dataset_tool:
+- handlet das sammeln von Daten für die simulation_cnn
+- hier lassen sich die einzeln aufgenommenen Bilder und deren labels anschauen
+- Befehle
+    - python dataset_tool.py stats (zeigt die aktuell im Ordner befindlichen npz-Dateien)
+    - python dataset_tool.py view (zeigt jedes frame an und man kann durchblättern)
+        - a/d: Bilder wechseln
+        - w/s: Episoden wechseln
+        - Leertaste: als Video abspielen lassen
+        - q: Vorschau beenden
+    - python dataset_tool.py export --out cnn_export --every  5 (optional export der Bilder als png und label als Excel)
+
+
+train_cnn:
+- trainiert das Modell mit den Daten aus der cnn_data
+

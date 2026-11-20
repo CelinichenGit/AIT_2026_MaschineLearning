@@ -8,8 +8,9 @@ import math
 
 import numpy as np
 import cv2 as cv
-import tensorflow as tf
-from tensorflow import keras
+
+# NOTE: tensorflow is imported lazily inside build_model() / CNNDriver, so that data collection
+# (simulation_cnn.py --mode collect) and dataset_tool.py also work without tensorflow and start faster.
 
 from tools.renderer3d import _generate_skybox_pattern_texture
 
@@ -34,8 +35,10 @@ def preprocess(bgr: np.ndarray) -> np.ndarray:
     return img
 
 
-def build_model() -> keras.Model:
-    inp = keras.Input((IMG_H, IMG_W, 3), dtype="uint8", name="image")
+def build_model():
+    from tensorflow import keras
+
+    inp =keras.Input((IMG_H, IMG_W, 3), dtype="uint8", name="image")
     x = keras.layers.Rescaling(1.0 / 255.0)(inp)
     x = keras.layers.Conv2D(24, 5, strides=2, activation="relu")(x)
     x = keras.layers.Conv2D(36, 5, strides=2, activation="relu")(x)
@@ -62,6 +65,10 @@ class CNNDriver:
 
     def __init__(self, model_path: str, steering_smoothing: float = 0.5):
         """steering_smoothing: 0 = no filter, towards 1 = strong low-pass filter (reduces jittering)."""
+        import tensorflow as tf
+        from tensorflow import keras
+
+        self._tf = tf
         self.model = keras.models.load_model(model_path)
         self.alpha = steering_smoothing
         self.last_steer = 0.0
@@ -74,7 +81,7 @@ class CNNDriver:
     def predict(self, bgr: np.ndarray):
         """Returns (target_speed_mps, steering_angle_rad)."""
         x = preprocess(bgr)[None]  # add batch dimension
-        out = self._forward(tf.constant(x))
+        out = self._forward(self._tf.constant(x))
         steer = float(out["steer"][0, 0]) * MAX_STEER_RAD
         speed = float(out["speed"][0, 0]) * MAX_SPEED_MPS
 
