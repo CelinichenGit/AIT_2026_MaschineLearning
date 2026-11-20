@@ -30,7 +30,7 @@ simulation_cnn:
 
 
 cnn_controller:
-- beinhaltet das Beschneiden der Bilder (bisher 110 pixel abgeschnitten, danach cv.InterArea)
+- beinhaltet eine Funktion zum Beschneiden der Bilder (bisher 110 pixel abgeschnitten, danach cv.InterArea)
     - cv.InterArea komprimiert das Bild auf eine variable Größe durch gewichteten Mittelwert
 - baut das kera-modell auf (hier werden auch die daten normiert-> rgb/255)
 - initiiert einen trained-driver in der Simulation
@@ -52,4 +52,5 @@ dataset_tool:
 
 train_cnn:
 - trainiert das Modell mit den Daten aus der cnn_data
+- speichert das Modell (den Datensatz) als "cnn_driver.keras" ab
 
