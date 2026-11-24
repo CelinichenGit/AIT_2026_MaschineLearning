@@ -12,5 +12,6 @@ weiter operation
 internierest: einfach nächsten auswählen
 bilineare inter-.: intepolation mit vier Stützpunkten den Mittelpunkt finden, gute Qualitäte, etwas schneller INter_linear
 
+pixel größe überlegen für neues bild, damit nihct unnätig aber genung
 
 
