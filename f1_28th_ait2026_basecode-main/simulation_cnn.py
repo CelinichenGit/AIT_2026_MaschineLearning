@@ -16,9 +16,18 @@ Typical workflow:
 
 Look at the recorded data with:  python dataset_tool.py view
 """
+import os
+import sys
+
+# Fix for "Segmentation fault" on Linux/Ubuntu with NVIDIA GPU when OpenGL (GLFW renderer) and tensorflow
+# run in the same process (see note in simulation_singlethreaded.py). Forces OpenGL to use the NVIDIA driver,
+# the same one CUDA/tensorflow uses. Must be set BEFORE any OpenGL library is loaded, i.e. before the imports below.
+# Only applied on Linux with an NVIDIA driver, and only if the variable is not already set by the user.
+if sys.platform.startswith("linux") and os.path.exists("/proc/driver/nvidia"):
+    os.environ.setdefault("__GLX_VENDOR_LIBRARY_NAME", "nvidia")
+
 import argparse
 import math
-import os
 import random
 import time
 
