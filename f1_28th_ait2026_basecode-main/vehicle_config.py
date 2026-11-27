@@ -3,7 +3,7 @@ vehicles = {
         "yellow": {
             "ip": "10.134.137.45",
             "port": 6446,
-            "delay_ms": 120,
+            "delay_ms": 120,        #Delay für Fahrzeug einstellen
             "motor_pid": (6, 0, 0),         #PID parameters to control the motor
             "steering_pid": (0.9, 0, 0),  #PID parameters to control the steering
             "steering_inverted": True,
@@ -12,7 +12,7 @@ vehicles = {
             "rear_axle_offset_m" : 0.065, #rear-center offset of the center of rear axle (where the black Dot on the vehicle is)
             "height_over_ground_white_marker_m": 0.025,
             "height_over_ground_colored_marker_m": 0.042,
-            "steering_measurements" : [(180, -24.67991246626858), (130, -10.119637971863794),(90, 5.179684238656864),(50, 25.66474028449667), (10, 41.47479972843025) ],
+            "steering_measurements" : [(180, -30.03368485153285), (130, -16.505033343421694), (90, -0.37852008175802687), (50, 20.537214781612377), (10, 27.63541446470892)],
             "max_steering_angle": 27,  #links
             "min_steering_angle": -27, #rechts
             "min_motor_value" : 60,         #min motor voltage (0-255) to get the vehicle moving
@@ -49,18 +49,18 @@ vehicles = {
             "port": 6446,
             "delay_ms": 130,
             "motor_pid": (6, 0, 0),         #PID parameters to control the motor
-            "steering_pid": (0.9, 0, 0),  #PID parameters to control the steering
+            "steering_pid": (0.8, 0, 0),  #PID parameters to control the steering
             "steering_inverted": True,
             "length_m": 0.18,           #vehicle length
             "width_m":  0.08,           #vehicle width
             "rear_axle_offset_m" : 0.065, #rear-center offset of the center of rear axle (where the black Dot on the vehicle is)
             "height_over_ground_white_marker_m": 0.025,
             "height_over_ground_colored_marker_m": 0.042,
-            "steering_measurements" : [(180, -24.638332242378844),(130, -16.28434769293722), (90, 3.4834823178040932), (50, 21.1302691899593), (10, 32.390484557380965)],
-            "max_steering_angle": 27,  #links
-            "min_steering_angle": -27, #rechts
-            "min_motor_value" : 50,         #min motor voltage (0-255) to get the vehicle moving
-            "max_motor_value" : 120,        #max motor voltage (0-255)
+            "steering_measurements" : [(180, -36.10199464583294), (130, -22.731846515508135),(90, -2.0265115567479937), (50, 10.775777232439044), (10, 24.971953998963805),],
+            "max_steering_angle": 30,  #links
+            "min_steering_angle": -30, #rechts
+            "min_motor_value" : 40,         #min motor voltage (0-255) to get the vehicle moving
+            "max_motor_value" : 110,        #max motor voltage (0-255)
             "speed_factor": 1.0,
             "lidar_field_of_view_deg": 160, 
             "lidar_numRays": 80, 

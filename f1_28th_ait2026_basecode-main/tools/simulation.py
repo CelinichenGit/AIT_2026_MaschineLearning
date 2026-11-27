@@ -5,6 +5,7 @@ from control.disparity_extender import DisparityExtender
 from control.lidarSensor import LidarSensor
 from tools.TrackProgressGated import TrackProgressGated
 import math
+from collections import deque  #SIMAN: Warteschlange für die verzögerten Fahrbefehle
 from shapely.geometry import LinearRing, Polygon, box
 import shapely
 
@@ -33,7 +34,10 @@ class Simulation:
                         egocam_distortion=None,
                         egocam_skybox_seed=4,
                         egocam_pitch_deg=0,
-                        egocam_forward_offset_m=0.0
+                        egocam_forward_offset_m=0.0,
+                        actuation_delay_s=None,        #SIMAN: Verzögerung Befehl -> Ausführung. None = "delay_ms" aus vehicle_config.py, 0 = aus
+                        motor_time_constant_s=0.3,     #SIMAN: Trägheit des Antriebs: Zeit bis ~63% der Zielgeschwindigkeit erreicht sind. 0 = aus
+                        steering_rate_deg_per_s=300.0  #SIMAN: max. Drehgeschwindigkeit des Lenkservos in Grad/s. None = aus
                  ):
         
         self.vertical_resolution_px=vertical_resolution_px 
@@ -60,6 +64,16 @@ class Simulation:
 
         self.egocam_forward_offset_m = egocam_forward_offset_m
         self.vehicle_color = vehicle_color
+
+        #SIMAN: Parameter für Verzögerung und Trägheit speichern.
+        #       Ohne Angabe wird die gemessene Verzögerung des echten Fahrzeugs (delay_ms) verwendet.
+        if actuation_delay_s is None:
+            actuation_delay_s = vehicles[vehicle_color]["delay_ms"] / 1000.0
+        self.actuation_delay_steps = max(0, int(round(actuation_delay_s / dt)))  #SIMAN: Verzögerung in ganzen Simulationsschritten
+        self.motor_time_constant_s = motor_time_constant_s
+        self.steering_rate_rad_per_s = None if steering_rate_deg_per_s is None else math.radians(steering_rate_deg_per_s)
+        self.command_queue = deque()      #SIMAN: noch nicht ausgeführte Befehle (Motorwert, Lenkwinkel)
+        self.current_steering_rad = 0.0   #SIMAN: tatsächlicher Lenkwinkel der Räder (folgt dem Befehl nur langsam)
         self.meters_to_pixels = meters_to_pixels
 
         #init renderer:
@@ -140,6 +154,11 @@ class Simulation:
         self.last_progress = 0
         self.current_time = 0
 
+        #SIMAN: Warteschlange mit "Stillstand"-Befehlen füllen. Die ersten Befehle des Reglers kommen dadurch
+        #       erst nach actuation_delay_steps Schritten beim Fahrzeug an, genau wie beim echten Auto.
+        self.command_queue = deque([(0, 0.0)] * self.actuation_delay_steps)
+        self.current_steering_rad = 0.0  #SIMAN: Räder stehen zu Beginn gerade
+
         v : Vehicle = self.v
 
         #create image#FrontKamera
@@ -207,6 +226,12 @@ class Simulation:
         #remember applied motor value for next iteration
         self.current_motor_value = current_motor_value
 
+        #SIMAN: Verzögerung. Der neue Befehl wird hinten in die Warteschlange gestellt, ausgeführt wird der
+        #       älteste Befehl vorne. So wirkt jeder Befehl erst actuation_delay_steps Schritte später
+        #       (Kamera -> PC -> Berechnung -> WLAN -> Fahrzeug).
+        self.command_queue.append((current_motor_value, target_steering_angle_rad))
+        delayed_motor_value, delayed_steering_rad = self.command_queue.popleft()
+
 
 
         ############# STEP 3 ###############
@@ -219,14 +244,31 @@ class Simulation:
         # NOTE: this is a very simplified model which assumes instant steering- and motorpower changes
 
 
-        v.vehicle_speed = current_motor_value / 100.0   # wild guess and highly unrealistic, as here the vehicle has NO mass inertia.
-                                                        # TODO: implement a more realistic vehicle model, which takes into account the mass of the vehicle and the inertia of the motor and servo.
+        #SIMAN: Trägheit des Motors. Der (verzögerte) Motorwert legt nur noch die Endgeschwindigkeit fest
+        #       (gleiche Umrechnung wie vorher: Motorwert / 100). Die tatsächliche Geschwindigkeit nähert sich
+        #       ihr exponentiell an (Verzögerungsglied 1. Ordnung, Zeitkonstante motor_time_constant_s).
+        #       Beschleunigen und Abbremsen/Ausrollen dauern dadurch eine Weile.
+        target_speed_mps = delayed_motor_value / 100.0
+        if self.motor_time_constant_s > 0:
+            alpha = 1.0 - math.exp(-self.dt / self.motor_time_constant_s)  #SIMAN: Anteil der Differenz, der pro Schritt aufgeholt wird
+            v.vehicle_speed += (target_speed_mps - v.vehicle_speed) * alpha
+        else:
+            v.vehicle_speed = target_speed_mps  #SIMAN: ohne Trägheit (altes Verhalten)
 
+        #SIMAN: Lenkrichtung wird jetzt auf den verzögerten Befehl angewendet (statt auf den aktuellen)
         if v.steering_inverted:
-            target_steering_angle_rad = -target_steering_angle_rad
+            delayed_steering_rad = -delayed_steering_rad
+
+        #SIMAN: Trägheit der Lenkung. Der Servo dreht pro Schritt höchstens um steering_rate * dt,
+        #       die Räder erreichen einen neuen Lenkwinkel also nicht sofort.
+        if self.steering_rate_rad_per_s is not None:
+            max_step = self.steering_rate_rad_per_s * self.dt
+            self.current_steering_rad += max(-max_step, min(max_step, delayed_steering_rad - self.current_steering_rad))
+        else:
+            self.current_steering_rad = delayed_steering_rad  #SIMAN: ohne Trägheit (altes Verhalten)
 
         # yaw rate (r) ≈ (vehicle speed (U) / wheelbase (L)) * sin(steering angle (δ))
-        v.yaw_rate = (v.vehicle_speed / v.wheel_base_m) * math.sin(target_steering_angle_rad)
+        v.yaw_rate = (v.vehicle_speed / v.wheel_base_m) * math.sin(self.current_steering_rad)  #SIMAN: tatsächlicher statt befohlener Lenkwinkel
         v.yaw = unwind_angle(v.yaw + v.yaw_rate*self.dt)
 
 

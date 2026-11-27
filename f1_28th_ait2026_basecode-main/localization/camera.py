@@ -220,10 +220,10 @@ class Camera:
                 ret, corners = cv.findChessboardCorners(img, (3, 3), None)
 
                 if ret:
-                    regionCenters.append( (int(corners[4][0][0] + yoff),
-                                           int(corners[4][0][1] + xoff)) )
+                    regionCenters.append( (int(corners[4][0] + yoff),
+                                           int(corners[4][1] + xoff)) )
                     
-                    cv.drawChessboardCorners(frame, (3,3), np.array([[[c[0][0]+yoff, c[0][1]+xoff]] for c in corners], dtype=np.float32), ret)
+                    cv.drawChessboardCorners(frame, (3,3), np.array([[[c[0]+yoff, c[1]+xoff]] for c in corners], dtype=np.float32), ret)
 
             if len(regionCenters) != 4:
                 print(f"Could not find all chessboard patterns ({len(regionCenters)}/4 detected)")
@@ -336,6 +336,7 @@ class Camera:
 
     def updateVehiclePosition(self, xPos : int, yPos : int, yaw : float, vehicle: Vehicle|None = None, detect_new_vehicles: bool = True, color: str|None = None, front_marker : list[int]|None = None, rear_marker : list[int]|None = None):
         threshold = (self.max_speed_vehicle_mps * self.meters_to_pixels) / self.frames_per_seconds
+        threshold *= 1.1
 
         if vehicle is not None:
             #check if what we found is remotely near the vehicle we want to update
@@ -799,7 +800,8 @@ class Camera:
                         saturation = self.getSaturationOfPixelFromImage(circle[0]+x_offset, circle[1]+y_offset, frame)
                         value =      self.getValueOfPixelFromImage     (circle[0]+x_offset, circle[1]+y_offset, frame)
 
-                        if saturation < 50 and value < 50:
+                        #if saturation < 50 and value < 50:
+                        if value < 50:
                             #remove from circles, as it is too dark.
                             if self.DEBUG:
                                 print("Removed black circle from list: ", circle)

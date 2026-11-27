@@ -212,11 +212,16 @@ def main():
                                 radius = signed_radius(startpos_of_vehicle, endpos_of_vehicle, startheading_of_vehicle) / cam.meters_to_pixels
                                 lw_deg = lenkwinkel_from_radius(radius_m=radius, radstand_m=0.095)
 
+                                if vehicle.steering_inverted:
+                                    lw_deg *= -1
+
                                 print(f"PWM: {target_steering_angle_pwm} results in steering angle {lw_deg*-1} [deg]")
 
-                                results.append( (target_steering_angle_pwm, lw_deg*-1) )
+                                results.append( (target_steering_angle_pwm, lw_deg) )
                                 calibrated = True
                 print("Calibration Results:")
+                if vehicle.steering_inverted:
+                    results.reverse()
                 print(results)
 
 

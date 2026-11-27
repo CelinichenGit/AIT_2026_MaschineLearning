@@ -51,6 +51,12 @@ distortionCoefficients = np.array([[ 0.02473071, -0.39668063,  0.00151336,  0.00
 
 frontcam_image_shape = (240, 320, 3) # small resolution to reduce bandwidth and latency.Höhe #Frontkamera   = 240 Pixel Breite = 320 Pixel Kanäle = 3
 
+# CNN controller: if True, the trained Keras model (cnn_controller.py / train_cnn.py) computes speed and
+# steering from the frontcam image instead of the lidar based DisparityExtender. Requires the frontcam.
+USE_CNN_CONTROLLER = True
+CNN_MODEL_PATH = "cnn_driver.keras"
+CNN_STEERING_SMOOTHING = 0.5   # 0 = no filter, towards 1 = strong low-pass filter
+
 
 # this code is running in another process. 
 # Data is transfered from the main thread using the d parameter
@@ -178,8 +184,21 @@ def showImageThread(d: dict, track: Track, shm_front_pointer: Value):
 
 # this code is running in another process. 
 # Data is transfered from the main thread using the d parameter
-def controlVehicleThread(d: dict, vehicleColor: str, delta_t: float):
+def controlVehicleThread(d: dict, vehicleColor: str, delta_t: float, shm_front_pointer=None, cnn_model_path=None):
     print(f"Starting controlVehicleThread for the {vehicleColor} vehicle.")
+
+    # optional: CNN controller that drives using only the frontcam image.
+    # tensorflow is loaded here (inside the child process), not in the main process.
+    cnn = None
+    front_buffers = None
+    if cnn_model_path is not None and shm_front_pointer is not None:
+        from cnn_controller import CNNDriver
+        cnn = CNNDriver(cnn_model_path, steering_smoothing=CNN_STEERING_SMOOTHING)
+        shm_front = SharedMemory(name="front")  # double buffer written by receive_frontcam_image_thread
+        image_bytes = math.prod(frontcam_image_shape) * np.dtype(np.uint8).itemsize
+        front_buffers = [np.ndarray(frontcam_image_shape, dtype=np.uint8, buffer=shm_front.buf, offset=0),
+                         np.ndarray(frontcam_image_shape, dtype=np.uint8, buffer=shm_front.buf, offset=image_bytes)]
+        print(f"{vehicleColor}: using CNN controller ({cnn_model_path}).")
     target_control_frequency = 40
     loop_time_s = 1.0 / target_control_frequency
     current_motor_value = 0
@@ -234,7 +253,16 @@ def controlVehicleThread(d: dict, vehicleColor: str, delta_t: float):
         v.command_frequency_hz = target_control_frequency
 
         #compute vehicle actions
-        target_velocity_mps, target_steering_angle_rad, rays, setpoint, emer_brake = v.compute_next_command(delta_t=end_to_end_delay_s, opponents=opponents)
+        if cnn is not None:
+            # latest complete frontcam image (BGR, already flipped) -> CNN -> (speed, steering)
+            front_frame = front_buffers[shm_front_pointer.value].copy()
+            if front_frame.any():
+                target_velocity_mps, target_steering_angle_rad = cnn.predict(front_frame)
+            else:
+                target_velocity_mps, target_steering_angle_rad = 0.0, 0.0  # no image received yet -> stand still
+            rays, setpoint, emer_brake = None, None, False
+        else:
+            target_velocity_mps, target_steering_angle_rad, rays, setpoint, emer_brake = v.compute_next_command(delta_t=end_to_end_delay_s, opponents=opponents)
 
 
         #limit steering angles due to vehicle configuration
@@ -453,8 +481,12 @@ def main():
     enable_frontcam = False
     show_frontcam = False
 
-    print("Do you want to use the frontcam (y/n)?")
-    key = input()
+    if USE_CNN_CONTROLLER:
+        print("CNN controller enabled -> frontcam is required and will be used.")
+        key = "Y"
+    else:
+        print("Do you want to use the frontcam (y/n)?")
+        key = input()
     if key.upper() == "Y":
         enable_frontcam = True
 
@@ -561,7 +593,10 @@ def main():
                 
 
                     #create process for controlling the vehice with color v.color:
-                    control_processes[v.color] = Process(target=controlVehicleThread, args=(d, v.color, 1.0/frames_per_seconds))
+                    control_processes[v.color] = Process(target=controlVehicleThread,
+                                                         args=(d, v.color, 1.0/frames_per_seconds,
+                                                               shm_front_pointer,
+                                                               CNN_MODEL_PATH if USE_CNN_CONTROLLER else None))
                     control_processes[v.color].start()
                 else:
                     print("Could not properly detect color of vehicle!")
