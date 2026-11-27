@@ -58,7 +58,8 @@ frontcam_image_shape = (240, 320, 3) # small resolution to reduce bandwidth and 
 #         Lehrer ist der Lidar-Controller (Position aus der Deckenkamera), er beschriftet jedes Frontkamera-Bild.
 COLLECT_MODE = "collect"          # #VORSAGE: "collect" = Lidar-Lehrer fährt | "dagger" = Vorhersage-CNN fährt, Lehrer beschriftet
 COLLECT_VEHICLE_COLOR = "yellow"  # #VORSAGE: nur dieses Fahrzeug hat die Frontkamera und wird aufgenommen
-DATA_DIR = "cnn_data_real"        # #VORSAGE: Ordner für die echten Daten (nicht mit den Simulationsdaten mischen)
+# #VORSAGE: Ordner für die echten Daten. Immer neben diesem Skript, egal aus welchem Ordner es gestartet wird.
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cnn_data_real")
 NOISE_DEG = 3.0                   # #VORSAGE: collect: Lenkrauschen (Std.-Abw. in Grad) auf den gefahrenen Befehl, 0 = aus
 DAGGER_BETA = 0.3                 # #VORSAGE: dagger: Wahrscheinlichkeit pro Frame, dass der Lehrer statt des CNN fährt
 REAL_DELAY_S = None               # #VORSAGE: Verzögerung Frontkamera-Bild -> Ausführung in s. None = delay_ms aus vehicle_config.py
@@ -210,6 +211,7 @@ class EpisodeRecorder:
         self.delay_steps, self.save_every = delay_steps, save_every
         self.context = None   # letzte delay_steps Frames der vorherigen Datei derselben Fahrt
         self.rec = self._new()
+        self.total = 0        # #VORSAGE: Anzahl aller aufgenommenen Frames (für die Fortschrittsanzeige)
 
     @staticmethod
     def _new():
@@ -219,6 +221,9 @@ class EpisodeRecorder:
     def add(self, **frame):
         for k, val in frame.items():
             self.rec[k].append(val)
+        self.total += 1
+        if self.total % 150 == 1:  # #VORSAGE: alle ~5 s ein Lebenszeichen
+            print(f"  Aufnahme läuft: {self.total} Frames, nächste Datei nach {self.save_every} Frames -> {self.data_dir}")
         if len(self.rec["x"]) >= self.save_every:
             self.flush(end_of_segment=False)
 
@@ -296,6 +301,7 @@ def controlVehicleThread(d: dict, vehicleColor: str, delta_t: float, shm_front_p
     smooth_start_time = time.time()
     last_image_counter = 0   # #VORSAGE: Nummer des zuletzt gesehenen Frontkamera-Bildes
     overruns = 0             # #VORSAGE: wie oft die Schleife die 30 Hz nicht geschafft hat
+    last_no_image_warning = 0.0  # #VORSAGE: Zeitpunkt der letzten "kein Frontkamera-Bild"-Warnung
 
     try:  # #VORSAGE: bei Abbruch (Ctrl+C / Fehler) die letzten Frames noch speichern
         while d["raceEnabled"]:
@@ -348,6 +354,11 @@ def controlVehicleThread(d: dict, vehicleColor: str, delta_t: float, shm_front_p
                 have_image = image_counter > 0
                 new_image = image_counter != last_image_counter
                 last_image_counter = image_counter
+                if not have_image and start_time - last_no_image_warning > 5.0:
+                    # #VORSAGE: ohne Frontkamera-Bild wird NICHTS gespeichert -> deutlich melden
+                    print(f"WARNUNG {vehicleColor}: noch kein Frontkamera-Bild empfangen (UDP-Port 9999) "
+                          f"-> es wird nichts aufgenommen.")
+                    last_no_image_warning = start_time
 
                 # #VORSAGE: LEHRER-BESCHRIFTUNG. Der Lidar-Controller bewertet die AKTUELLE Position (ohne Vorhersage,
                 #           LABEL_DELTA_T), genau wie in der Simulation. Das "in die Zukunft schauen" passiert beim Training
@@ -733,6 +744,9 @@ def main():
                     #create process for controlling the vehice with color v.color:
                     # #VORSAGE: nur COLLECT_VEHICLE_COLOR nimmt auf (und bekommt die Frontkamera), andere fahren normal mit Lidar
                     record_this = (v.color == COLLECT_VEHICLE_COLOR) and shm_front_pointer is not None
+                    if not record_this:  # #VORSAGE: deutlich melden, wenn dieses Fahrzeug NICHT aufgenommen wird
+                        print(f"HINWEIS: Fahrzeug '{v.color}' fährt ohne Aufnahme "
+                              f"(aufgenommen wird nur COLLECT_VEHICLE_COLOR = '{COLLECT_VEHICLE_COLOR}').")
                     control_processes[v.color] = Process(target=controlVehicleThread,
                                                          args=(d, v.color, 1.0/frames_per_seconds,
                                                                shm_front_pointer if record_this else None,
