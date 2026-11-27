@@ -40,7 +40,10 @@ def load_files(files, n):
     for f in files:
         d = np.load(f)
         T = len(d["x"])
-        if T <= n:  # #VORSAGE: Episode zu kurz, um die Beschriftung um n zu verschieben
+        # #VORSAGE: echte Aufnahmen (main_collect_vorhersage.py) werden in Stücken gespeichert. Die ersten skip_first
+        #           Frames eines Stücks sind nur Vorgeschichte für den cmds-Input und werden nicht als Beispiel benutzt.
+        skip = int(d["skip_first"]) if "skip_first" in d else 0
+        if T - n <= skip:  # #VORSAGE: Episode zu kurz, um die Beschriftung um n zu verschieben
             continue
 
         # #VORSAGE: gesendete Befehle der Episode. Alte Aufnahmen (simulation_cnn.py) haben kein sent_speed_mps;
@@ -52,8 +55,8 @@ def load_files(files, n):
         c = pending_command_features(sent_speed, sent_steer, rec_delay, n)
 
         # #VORSAGE: Beschriftung verschieben. Bild t (nur t < T-n) bekommt den Lehrer-Befehl von t + n.
-        xs.append(d["x"][:T - n]); cmds.append(c[:T - n])
-        steers.append(d["steer"][n:]); speeds.append(d["speed"][n:])
+        xs.append(d["x"][skip:T - n]); cmds.append(c[skip:T - n])          # #VORSAGE: ab skip
+        steers.append(d["steer"][skip + n:]); speeds.append(d["speed"][skip + n:])
     if not xs:
         raise SystemExit("Keine Episode lang genug.")
     return np.concatenate(xs), np.concatenate(cmds), np.concatenate(steers), np.concatenate(speeds)
