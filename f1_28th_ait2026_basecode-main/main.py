@@ -54,7 +54,7 @@ frontcam_image_shape = (240, 320, 3) # small resolution to reduce bandwidth and 
 # CNN controller: if True, the trained Keras model (cnn_controller.py / train_cnn.py) computes speed and
 # steering from the frontcam image instead of the lidar based DisparityExtender. Requires the frontcam.
 USE_CNN_CONTROLLER = True
-CNN_MODEL_PATH = "cnn_driver.keras"
+CNN_MODEL_PATH = "cnn_driver_vorhersage.keras"
 CNN_STEERING_SMOOTHING = 0.5   # 0 = no filter, towards 1 = strong low-pass filter
 
 
@@ -257,7 +257,8 @@ def controlVehicleThread(d: dict, vehicleColor: str, delta_t: float, shm_front_p
             # latest complete frontcam image (BGR, already flipped) -> CNN -> (speed, steering)
             front_frame = front_buffers[shm_front_pointer.value].copy()
             if front_frame.any():
-                target_velocity_mps, target_steering_angle_rad = cnn.predict(front_frame)
+                target_velocity_mps1, target_steering_angle_rad = cnn.predict(front_frame)
+                target_velocity_mps = target_velocity_mps1 * 0.7
             else:
                 target_velocity_mps, target_steering_angle_rad = 0.0, 0.0  # no image received yet -> stand still
             rays, setpoint, emer_brake = None, None, False

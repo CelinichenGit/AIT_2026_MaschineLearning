@@ -1,0 +1,22 @@
+Ein Netz speichert keine Daten, es hat nur seine Gewichte so eingestellt, dass sie zu den bisherigen Trainingsdaten passen. Trainiert ihr nur auf neuen Daten weiter, verschiebt Gradient Descent die Gewichte so, dass sie nur noch zu den neuen Daten passen. Was vorher gut funktioniert hat, wird dabei überschrieben. Das heißt Catastrophic Forgetting (katastrophales Vergessen).
+
+Ein Beispiel für euch: Ihr trainiert nur noch mit realen Daten von einem sonnigen Nachmittag. Danach fährt das Modell vielleicht bei Deckenlicht schlechter als vorher, obwohl es das schon einmal konnte.
+
+Die Vorlesung sagt dasselbe von der anderen Seite: Trainingsdaten müssen „repräsentativ für alles sein“, was das Modell später verarbeiten soll (Folie „Supervised Learning“). Ein Datensatz, der nur die neuesten Aufnahmen enthält, ist das nicht.
+
+Euer eigenes Verfahren braucht die alten Daten
+
+DAgger steht für Dataset Aggregation. Das Verfahren funktioniert nur, weil die neuen Korrekturdaten zu den alten dazukommen und dann auf allem trainiert wird. Wenn ihr die alten Daten löscht, ist es kein DAgger mehr.
+
+Wie ihr mit neuen Daten trainieren solltet
+Auf allem neu trainieren (am saubersten): alte und neue Daten zusammenlegen und das Modell von vorne oder vom letzten Stand aus trainieren. Bei eurer Datenmenge dauert das auf den Poolrechnern nicht lange.
+Weitertrainieren mit Mischung (schneller): vom bisherigen Modell aus weitertrainieren, mit kleiner Lernrate. Jede Trainingsrunde enthält dann die neuen Daten plus eine zufällige Auswahl der alten, zum Beispiel 50/50. Das heißt Replay.
+Gewichten statt löschen: Wenn ihr wollt, dass die realen Daten wichtiger sind als die simulierten, nehmt sie öfter in jede Trainingsrunde auf oder gebt ihnen ein höheres Gewicht, zum Beispiel über sample_weight in Keras. Die Simulationsdaten bleiben trotzdem drin.
+Weitere Gründe, die Daten zu behalten
+Für den Bericht: Ihr wollt Versuche vergleichen, etwa „nur Simulation“ gegen „Simulation + real“ gegen „+ DAgger“. Dafür braucht ihr alle Datensätze.
+Testdaten: Eure festen Testfahrten müssen gleich bleiben, sonst sind die Ergebnisse verschiedener Modelle nicht vergleichbar.
+Wenn etwas schiefgeht: Ihr könnt jedes Modell jederzeit neu trainieren.
+
+Löschen ist nur sinnvoll bei Daten, die wirklich kaputt sind: falsch synchronisierte Aufnahmen, Fahrten mit falschem Vorzeichen bei der Lenkung, eingefrorene Kamerabilder. Solche Fahrten am besten in einen Ordner aussortiert/ verschieben statt sie direkt zu löschen, und im Experiment-Logbuch notieren, warum.
+
+Wenn der Speicherplatz knapp wird, speichert die Bilder als JPEG statt PNG oder bereits verkleinert. Das spart viel Platz.

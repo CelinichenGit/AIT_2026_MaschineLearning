@@ -7,7 +7,7 @@ from localization.pid_controller import PIDController
 from control.track import Track
 from control.disparity_extender import DisparityExtender
 from control.lidarSensor import LidarSensor
-from shapely import LineString
+from shapely import LineString, Polygon  # #SAFE: Polygon für die Wandkontakt-Erkennung
 import numpy as np
 import math
 
@@ -53,18 +53,49 @@ distortionCoefficients = np.array([[ 0.02473071, -0.39668063,  0.00151336,  0.00
 
 frontcam_image_shape = (240, 320, 3) # small resolution to reduce bandwidth and latency.Höhe #Frontkamera   = 240 Pixel Breite = 320 Pixel Kanäle = 3
 
+#SAFE: main_collect_vorhersage_safe.py = Kopie von main_collect_vorhersage.py, die NUR "saubere" Fahrdaten speichert.
+#       Alle Frames laufen zuerst durch einen Puffer von DISCARD_BEFORE_CRASH_FRAMES Frames. Erst wenn sie älter als dieser
+#       Puffer sind und in der Zwischenzeit kein Crash erkannt wurde, werden sie an den Recorder übergeben.
+#       Bei einem Crash wird der Puffer (= die letzten 30 Frames vor dem Crash) verworfen, die Datei-Zeitreihe beendet und
+#       erst wieder aufgenommen, wenn das Fahrzeug CRASH_RECOVERY_S Sekunden ohne Crash-Anzeichen gefahren ist.
+#       Crash-Anzeichen: Fahrzeug-Rechteck berührt/überschreitet eine Streckenbegrenzung, Fahrzeug steckt fest
+#       (Gas gegeben, aber keine Bewegung), Positionssprung (Auto wurde umgesetzt) oder Tracking verloren.
 #VORSAGE: main_collect_vorhersage.py = Kopie von main_vorhersage.py zum DATEN SAMMELN auf der echten Strecke.
 #         Gespeichert wird im selben Format wie simulation_cnn_vorhersage.py -> direkt nutzbar mit train_cnn_vorhersage.py.
 #         Lehrer ist der Lidar-Controller (Position aus der Deckenkamera), er beschriftet jedes Frontkamera-Bild.
-COLLECT_MODE = "collect"          # #VORSAGE: "collect" = Lidar-Lehrer fährt | "dagger" = Vorhersage-CNN fährt, Lehrer beschriftet
+COLLECT_MODE = "drive"          # #VORSAGE: "collect" = Lidar-Lehrer fährt | "dagger" = Vorhersage-CNN fährt, Lehrer beschriftet
+                                  # #SAFE:    "drive"   = NUR das CNN fährt (kein Lehrer-Eingriff), es wird NICHTS gespeichert.
+                                  #           Crash-Erkennung läuft trotzdem und meldet Crashes in der Konsole.
+assert COLLECT_MODE in ("collect", "dagger", "drive"), f"unbekannter COLLECT_MODE '{COLLECT_MODE}'"
+SAVE_DATA = COLLECT_MODE != "drive"  # #SAFE: im drive-Modus wird keine Datei geschrieben
+CNN_DRIVES = COLLECT_MODE in ("dagger", "drive")  # #SAFE: Modus, in dem das CNN fährt (Modell wird geladen)
 COLLECT_VEHICLE_COLOR = "yellow"  # #VORSAGE: nur dieses Fahrzeug hat die Frontkamera und wird aufgenommen
 # #VORSAGE: Ordner für die echten Daten. Immer neben diesem Skript, egal aus welchem Ordner es gestartet wird.
-DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cnn_data_real")
+# #SAFE: eigener Ordner, damit gefilterte und ungefilterte Daten getrennt bleiben
+#        (train_cnn_vorhersage.py kann mehrere Ordner gleichzeitig laden)
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cnn_data_real_safe")
 NOISE_DEG = 3.0                   # #VORSAGE: collect: Lenkrauschen (Std.-Abw. in Grad) auf den gefahrenen Befehl, 0 = aus
 DAGGER_BETA = 0.3                 # #VORSAGE: dagger: Wahrscheinlichkeit pro Frame, dass der Lehrer statt des CNN fährt
 REAL_DELAY_S = None               # #VORSAGE: Verzögerung Frontkamera-Bild -> Ausführung in s. None = delay_ms aus vehicle_config.py
 LABEL_DELTA_T = 0.0               # #VORSAGE: Lehrer-Beschriftung für die aktuelle Position (keine eigene Vorhersage)
 SAVE_EVERY_FRAMES = 900           # #VORSAGE: alle 900 Frames (= 30 s) eine Datei schreiben
+
+# #SAFE: Crash-Filter
+DISCARD_BEFORE_CRASH_FRAMES = 30  # #SAFE: so viele Frames VOR einem Crash werden verworfen (30 Frames = 1 s bei 30 Hz)
+CRASH_RECOVERY_S = 1.0            # #SAFE: nach einem Crash erst wieder aufnehmen, wenn so lange alles ok war
+DISCARD_PENDING_AT_END = True     # #SAFE: beim Beenden (Ctrl+C, meist nach einem Crash) die letzten 30 Frames verwerfen
+DISCARD_ON_TRACKING_LOSS = True   # #SAFE: Tracking verloren (Auto hochgehoben/umgekippt) wie einen Crash behandeln
+TRACKING_LOSS_TOLERANCE_S = 0.5   # #SAFE: ... aber erst, wenn das Tracking LÄNGER als diese Zeit weg ist.
+                                  #        Kürzere Aussetzer: kein Crash, nichts wird verworfen, nur die Datei wird
+                                  #        an der Lücke geteilt (die Zeitreihe hat dort fehlende Frames).
+CRASH_OUTSIDE_FRACTION = 0.3      # #SAFE: Crash erst, wenn mehr als dieser Anteil (0.3 = 30 %) der Fahrzeugfläche
+                                  #        außerhalb der Trackboundaries liegt. 0.0 = altes Verhalten (jede Berührung)
+CRASH_WALL_MARGIN_M = 0.0         # #SAFE: vergrößert das Fahrzeug-Rechteck um diesen Rand (m), bevor der Anteil berechnet wird
+CRASH_STUCK_MIN_SENT_MPS = 0.3    # #SAFE: "steckt fest": gesendete Geschwindigkeit mindestens so hoch ...
+CRASH_STUCK_MAX_ACTUAL_MPS = 0.1  # #SAFE: ... aber gemessene Geschwindigkeit darunter ...
+CRASH_STUCK_TIME_S = 1.0          # #SAFE: ... und das länger als diese Zeit
+CRASH_STARTUP_IGNORE_S = 2.0      # #SAFE: in den ersten Sekunden nach dem Start kein "steckt fest" (Anfahren)
+CRASH_MAX_JUMP_M = 0.3            # #SAFE: Positionssprung pro Frame (1/30 s), ab dem das Auto als umgesetzt gilt
 # Geschwindigkeit: "speed_factor" in vehicle_config.py (wirkt auf den Lehrer -> auch auf die Beschriftung)
 
 USE_CNN_CONTROLLER = True          # #VORSAGE: sorgt nur noch dafür, dass die Frontkamera immer eingeschaltet wird
@@ -239,10 +270,16 @@ class EpisodeRecorder:
             skip = len(self.context["x"])
             data = {k: self.context[k] + self.rec[k] for k in self.rec}
 
+        if not SAVE_DATA:  # #SAFE: drive-Modus -> nichts schreiben, nur Puffer leeren
+            self.context = None
+            self.rec = self._new()
+            return
         os.makedirs(self.data_dir, exist_ok=True)
         fname = os.path.join(self.data_dir, f"real_{self.mode}_{self.color}_{time.strftime('%Y%m%d_%H%M%S')}"
                                             f"_{random.randint(0, 9999):04d}.npz")
-        arrays = {k: np.asarray(v, dtype=np.uint8 if k == "x" else np.float32) for k, v in data.items()}
+        # #SAFE: t als float64 - in float32 hat die Unixzeit nur 128 s Auflösung (alle t einer Datei wären gleich)
+        arrays = {k: np.asarray(v, dtype=np.uint8 if k == "x" else np.float64 if k == "t" else np.float32)
+                  for k, v in data.items()}
         np.savez_compressed(fname, **arrays,
                             delay_steps=np.asarray(self.delay_steps),   # Verzögerung dieser Aufnahme (in 1/30 s)
                             skip_first=np.asarray(skip),                # erste Frames nur Vorgeschichte
@@ -252,6 +289,120 @@ class EpisodeRecorder:
         self.context = None if (end_of_segment or self.delay_steps == 0) else \
             {k: data[k][-self.delay_steps:] for k in data}
         self.rec = self._new()
+
+
+class CrashDetector:
+    """#SAFE: erkennt Crash-Anzeichen anhand der Deckenkamera-Position. check() gibt None oder einen Grund (str) zurück."""
+
+    def __init__(self, track: Track):
+        self.track = track
+        self.stuck_since = None
+        self.last_pos = None
+
+    def reset(self):
+        self.stuck_since = None
+        self.last_pos = None
+
+    def check(self, v: Vehicle, sent_speed_mps: float, t: float, startup: bool):
+        reason = None
+
+        # 1) Wandkontakt: erst wenn mehr als CRASH_OUTSIDE_FRACTION der Fahrzeug-Rechteckfläche außerhalb der Strecke
+        #    liegt. Ein leichtes Überschreiten der Begrenzung (Kurven schneiden, Tracking-Rauschen) ist kein Crash.
+        #    (Die frühere Mittelpunkt-Prüfung ist hier mit drin: Mittelpunkt draußen ~ 50 % der Fläche draußen.)
+        try:
+            bbox = Polygon(v.getBoundingBox())
+            if CRASH_WALL_MARGIN_M > 0:
+                bbox = bbox.buffer(CRASH_WALL_MARGIN_M * meters_to_pixels)
+            if bbox.area > 0:
+                outside_fraction = 1.0 - bbox.intersection(self.track.polygon).area / bbox.area
+                if outside_fraction > CRASH_OUTSIDE_FRACTION:
+                    reason = f"außerhalb der Strecke ({outside_fraction * 100:.0f} % des Fahrzeugs)"
+        except Exception as e:  # Geometrie-Fehler sollen die Fahrt nicht abbrechen
+            print(f"  CrashDetector: Wandprüfung fehlgeschlagen ({e})")
+
+        # 2) Positionssprung: Auto wurde hochgehoben/umgesetzt oder Tracking springt
+        pos = (float(v.x), float(v.y))
+        if reason is None and self.last_pos is not None:
+            jump_m = math.dist(pos, self.last_pos) / meters_to_pixels
+            if jump_m > CRASH_MAX_JUMP_M:
+                reason = f"Positionssprung {jump_m:.2f} m"
+        self.last_pos = pos
+
+        # 3) Steckt fest: Gas gegeben, aber keine Bewegung (z. B. Front an der Wand)
+        if not startup and sent_speed_mps > CRASH_STUCK_MIN_SENT_MPS and abs(v.getSpeed()) < CRASH_STUCK_MAX_ACTUAL_MPS:
+            if self.stuck_since is None:
+                self.stuck_since = t
+            elif reason is None and t - self.stuck_since > CRASH_STUCK_TIME_S:
+                reason = "steckt fest (keine Bewegung trotz Gas)"
+        else:
+            self.stuck_since = None
+
+        return reason
+
+
+class CrashFilterRecorder:
+    """#SAFE: Puffer vor dem EpisodeRecorder. Frames werden erst nach discard_frames Frames weitergegeben.
+    Bei einem Crash wird der Puffer verworfen und die Aufnahme für recovery_frames Frames ausgesetzt."""
+
+    def __init__(self, recorder: EpisodeRecorder, discard_frames: int, recovery_frames: int):
+        self.recorder = recorder
+        self.discard_frames = discard_frames
+        self.recovery_frames = recovery_frames
+        self.pending = collections.deque()
+        self.blocked = 0          # verbleibende Frames bis die Aufnahme nach einem Crash wieder startet
+        self.in_crash = False
+        self.crashes = 0
+        self.kept = 0
+        self.discarded = 0
+
+    def add(self, **frame):
+        if self.blocked > 0:
+            self.blocked -= 1
+            self.discarded += 1
+            if self.blocked == 0:
+                self.in_crash = False
+                print(f"  CrashFilter: Fahrzeug wieder ok -> Aufnahme läuft weiter "
+                      f"(behalten {self.kept}, verworfen {self.discarded}, Crashes {self.crashes})")
+            return
+        self.pending.append(frame)
+        if len(self.pending) > self.discard_frames:
+            self.recorder.add(**self.pending.popleft())
+            self.kept += 1
+
+    def crash(self, reason: str):
+        if not self.in_crash:
+            self.crashes += 1
+            print(f"  CRASH erkannt ({reason}): {len(self.pending)} Frames "
+                  f"({len(self.pending) * CMD_DT_SAFE:.1f} s) davor werden verworfen.")
+        self.in_crash = True
+        self.discarded += len(self.pending)
+        self.pending.clear()
+        self.recorder.flush(end_of_segment=True)  # Zeitreihe ist unterbrochen
+        self.blocked = self.recovery_frames        # bei Dauer-Crash (steckt fest) immer wieder neu gesetzt
+
+    def gap(self):
+        """#SAFE: kurze Lücke ohne Crash (z. B. kurzer Tracking-Aussetzer): gepufferte Frames BEHALTEN,
+        aber die Zeitreihe an der Lücke beenden, weil dort Frames fehlen."""
+        for frame in self.pending:
+            self.recorder.add(**frame)
+            self.kept += 1
+        self.pending.clear()
+        self.recorder.flush(end_of_segment=True)
+
+    def finish(self):
+        if DISCARD_PENDING_AT_END:
+            self.discarded += len(self.pending)
+        else:
+            for frame in self.pending:
+                self.recorder.add(**frame)
+                self.kept += 1
+        self.pending.clear()
+        self.recorder.flush(end_of_segment=True)
+        print(f"  CrashFilter Ende: behalten {self.kept} Frames, verworfen {self.discarded} Frames, "
+              f"{self.crashes} Crashes erkannt.")
+
+
+CMD_DT_SAFE = 1.0 / 30.0  # #SAFE: nur für Ausgaben, wird in controlVehicleThread durch CMD_DT überschrieben
 
 
 def controlVehicleThread(d: dict, vehicleColor: str, delta_t: float, shm_front_pointer=None,
@@ -266,15 +417,19 @@ def controlVehicleThread(d: dict, vehicleColor: str, delta_t: float, shm_front_p
 
     # #VORSAGE: Hilfsfunktionen und Konstanten des Vorhersage-Modells (gleiche Vorverarbeitung/Normierung wie beim Training)
     from cnn_controller_vorhersage import preprocess, CMD_DT, MAX_STEER_RAD, MAX_SPEED_MPS
+    global CMD_DT_SAFE
+    CMD_DT_SAFE = CMD_DT
 
     cnn = None
     front_buffers = None
     recorder = None
+    crash_filter = None    # #SAFE
+    crash_detector = None  # #SAFE
     if record:
-        if COLLECT_MODE == "dagger":
+        if CNN_DRIVES:
             from cnn_controller_vorhersage import CNNDriverVorhersage
             cnn = CNNDriverVorhersage(cnn_model_path, steering_smoothing=CNN_STEERING_SMOOTHING)
-            print(f"{vehicleColor}: DAgger mit {cnn_model_path} ({cnn.n} Schritte Verzögerung).")
+            print(f"{vehicleColor}: {COLLECT_MODE} mit {cnn_model_path} ({cnn.n} Schritte Verzögerung).")
         shm_front = SharedMemory(name="front")  # double buffer written by receive_frontcam_image_thread
         image_bytes = math.prod(frontcam_image_shape) * np.dtype(np.uint8).itemsize
         front_buffers = [np.ndarray(frontcam_image_shape, dtype=np.uint8, buffer=shm_front.buf, offset=0),
@@ -283,8 +438,16 @@ def controlVehicleThread(d: dict, vehicleColor: str, delta_t: float, shm_front_p
         # #VORSAGE: Verzögerung Bild -> Ausführung in Simulationsschritten (1/30 s), wird mit jeder Datei gespeichert
         real_delay_s = REAL_DELAY_S if REAL_DELAY_S is not None else vehicles[vehicleColor]["delay_ms"] / 1000.0
         delay_steps = int(round(real_delay_s / CMD_DT))
-        recorder = EpisodeRecorder(DATA_DIR, COLLECT_MODE, vehicleColor, delay_steps, SAVE_EVERY_FRAMES)
-        print(f"{vehicleColor}: Aufnahme '{COLLECT_MODE}' nach {DATA_DIR}/, Verzögerung {delay_steps} Schritte "
+        recorder = EpisodeRecorder(DATA_DIR, COLLECT_MODE + "_safe", vehicleColor, delay_steps, SAVE_EVERY_FRAMES)
+        # #SAFE: Crash-Filter vor den Recorder schalten
+        crash_filter = CrashFilterRecorder(recorder,
+                                           discard_frames=DISCARD_BEFORE_CRASH_FRAMES,
+                                           recovery_frames=int(round(CRASH_RECOVERY_S / CMD_DT)))
+        print(f"{vehicleColor}: Crash-Filter aktiv: {DISCARD_BEFORE_CRASH_FRAMES} Frames vor jedem Crash werden verworfen, "
+              f"Neustart der Aufnahme nach {CRASH_RECOVERY_S:.1f} s ohne Crash.")
+        if not SAVE_DATA:
+            print(f"{vehicleColor}: Modus 'drive' -> das CNN fährt allein, es werden KEINE Daten gespeichert.")
+        print(f"{vehicleColor}: Aufnahme '{COLLECT_MODE}' nach {DATA_DIR if SAVE_DATA else '(nichts)'}/, Verzögerung {delay_steps} Schritte "
               f"({delay_steps * CMD_DT * 1000:.0f} ms), Lenkrauschen {NOISE_DEG if COLLECT_MODE == 'collect' else 0} Grad")
 
     # #VORSAGE: beim Aufnehmen läuft die Schleife mit 30 Hz, damit ein Frame = ein Schritt wie in der Simulation (CMD_DT)
@@ -302,6 +465,8 @@ def controlVehicleThread(d: dict, vehicleColor: str, delta_t: float, shm_front_p
     last_image_counter = 0   # #VORSAGE: Nummer des zuletzt gesehenen Frontkamera-Bildes
     overruns = 0             # #VORSAGE: wie oft die Schleife die 30 Hz nicht geschafft hat
     last_no_image_warning = 0.0  # #VORSAGE: Zeitpunkt der letzten "kein Frontkamera-Bild"-Warnung
+    tracking_lost_since = None   # #SAFE: Zeitpunkt, seit dem das Tracking weg ist (None = Tracking ok)
+    tracking_loss_crashed = False  # #SAFE: wurde der aktuelle Aussetzer schon als Crash gewertet?
 
     try:  # #VORSAGE: bei Abbruch (Ctrl+C / Fehler) die letzten Frames noch speichern
         while d["raceEnabled"]:
@@ -320,15 +485,36 @@ def controlVehicleThread(d: dict, vehicleColor: str, delta_t: float, shm_front_p
             if v is None:
                 d["lidar_rays_" + vehicleColor] = None
                 d["setpoints_" + vehicleColor]  = None
-                # #VORSAGE: Tracking verloren -> Fahrt-Abschnitt beenden und speichern (die Zeitreihe ist unterbrochen)
-                if recorder is not None:
-                    recorder.flush(end_of_segment=True)
-                if cnn is not None:
-                    cnn.reset()
+                # #SAFE: Tracking verloren. Erst nach TRACKING_LOSS_TOLERANCE_S als Crash werten (letzte 30 Frames
+                #        verwerfen). Kürzere Aussetzer werden beim Wiederfinden als Lücke behandelt (siehe unten).
+                now = time.time()
+                if tracking_lost_since is None:
+                    tracking_lost_since = now
+                if now - tracking_lost_since > TRACKING_LOSS_TOLERANCE_S:
+                    if crash_filter is not None and DISCARD_ON_TRACKING_LOSS:
+                        crash_filter.crash(f"Tracking länger als {TRACKING_LOSS_TOLERANCE_S:.1f} s verloren")
+                    if not tracking_loss_crashed and cnn is not None:
+                        cnn.reset()
+                    tracking_loss_crashed = True
+                time.sleep(0.002)  # #SAFE: nicht mit 100 % CPU auf das Tracking warten
                 continue
+
+            if tracking_lost_since is not None:
+                # #SAFE: Tracking wieder da. Kurzer Aussetzer (oder Crash-Wertung abgeschaltet) -> Daten behalten,
+                #        aber an der Lücke eine neue Datei beginnen. Langer Aussetzer -> crash() hat schon alles erledigt.
+                if crash_filter is not None and (not tracking_loss_crashed or not DISCARD_ON_TRACKING_LOSS):
+                    crash_filter.gap()
+                    print(f"  Tracking-Aussetzer {time.time() - tracking_lost_since:.2f} s -> kein Crash, Daten behalten.")
+                if crash_detector is not None:
+                    crash_detector.reset()  # sonst würde die Bewegung während der Lücke als Positionssprung gelten
+                tracking_lost_since = None
+                tracking_loss_crashed = False
 
             #set end-to-end delay from config (vehicle dependent, since hw revisions may be different)
             end_to_end_delay_s = v.delay_ms / 1000.0
+
+            if record and crash_detector is None:  # #SAFE: Strecke kommt über den Lidar-Sensor des Fahrzeugs
+                crash_detector = CrashDetector(v.lidar.track)
 
             if pid_control_motor is None:
                 pid_control_motor = v.motor_pid
@@ -368,9 +554,9 @@ def controlVehicleThread(d: dict, vehicleColor: str, delta_t: float, shm_front_p
                 label_steer = float(np.clip(label_steer, -MAX_STEER_RAD, MAX_STEER_RAD))
 
                 # #VORSAGE: welcher Befehl wird wirklich gefahren?
-                if COLLECT_MODE == "dagger" and have_image and random.random() >= DAGGER_BETA:
+                if CNN_DRIVES and have_image and (COLLECT_MODE == "drive" or random.random() >= DAGGER_BETA):
                     target_velocity_mps, target_steering_angle_rad = cnn.predict(front_frame, start_time)  # CNN fährt
-                elif COLLECT_MODE == "dagger" and not have_image:
+                elif CNN_DRIVES and not have_image:
                     target_velocity_mps, target_steering_angle_rad = 0.0, 0.0   # noch kein Bild -> stehen bleiben
                 else:
                     # Lehrer fährt, MIT Verzögerungsausgleich wie in main.py (sonst fährt er auf der echten Strecke schlechter)
@@ -407,15 +593,20 @@ def controlVehicleThread(d: dict, vehicleColor: str, delta_t: float, shm_front_p
                 # #VORSAGE: Frame speichern: Bild + Lehrer-Beschriftung + gesendeter Befehl (+ Infos zur Analyse).
                 #           Jede Schleife (= 1/30 s) ein Frame, auch wenn das Bild noch dasselbe ist (new_image = 0),
                 #           damit der Zeitabstand konstant bleibt, so wie es train_cnn_vorhersage.py erwartet.
-                if have_image:
-                    recorder.add(x=preprocess(front_frame),
-                                 steer=label_steer / MAX_STEER_RAD,
-                                 speed=float(np.clip(label_speed / MAX_SPEED_MPS, 0.0, 1.0)),
-                                 executed_steer_rad=float(sent_steering_angle_rad),
-                                 sent_speed_mps=float(target_velocity_mps),
-                                 actual_speed_mps=float(v.getSpeed()),
-                                 pos_x=float(v.x), pos_y=float(v.y), yaw=float(v.yaw),
-                                 t=start_time, new_image=float(new_image))
+                # #SAFE: Crash prüfen. Bei Crash wird dieser Frame nicht gespeichert und der Puffer verworfen.
+                crash_reason = crash_detector.check(v, target_velocity_mps, start_time,
+                                                    startup=time.time() - smooth_start_time < CRASH_STARTUP_IGNORE_S)
+                if crash_reason is not None:
+                    crash_filter.crash(crash_reason)
+                elif have_image:
+                    crash_filter.add(x=preprocess(front_frame),
+                                     steer=label_steer / MAX_STEER_RAD,
+                                     speed=float(np.clip(label_speed / MAX_SPEED_MPS, 0.0, 1.0)),
+                                     executed_steer_rad=float(sent_steering_angle_rad),
+                                     sent_speed_mps=float(target_velocity_mps),
+                                     actual_speed_mps=float(v.getSpeed()),
+                                     pos_x=float(v.x), pos_y=float(v.y), yaw=float(v.yaw),
+                                     t=start_time, new_image=float(new_image))
 
             #send actions to vehicle
             current_motor_value = v.sendControlsToHardware(target_velocity_mps=target_velocity_mps,
@@ -447,8 +638,8 @@ def controlVehicleThread(d: dict, vehicleColor: str, delta_t: float, shm_front_p
 
             d["control_loop_frequency_" +  vehicleColor] = 1.0/(dt+max(sleep_time, 0.0))
     finally:
-        if recorder is not None:
-            recorder.flush(end_of_segment=True)  # #VORSAGE: Rest speichern
+        if crash_filter is not None:
+            crash_filter.finish()  # #SAFE: Rest speichern (ohne die letzten 30 Frames, siehe DISCARD_PENDING_AT_END)
 
 def receive_frontcam_image_thread(shm_name: str, shm_front_pointer, shm_front_counter=None):  # #VORSAGE: + Bildzähler
     # Shared memory to store latest frontcam picture
@@ -742,6 +933,13 @@ def main():
                 
 
                     #create process for controlling the vehice with color v.color:
+                    # #SAFE: KEINE Duplikate. Nach einem Tracking-Verlust wird das Fahrzeug hier neu erkannt. Läuft für
+                    #        diese Farbe noch ein Steuerprozess, übernimmt DER das Fahrzeug wieder (er liest es aus
+                    #        d["vehicles"]). Vorher wurde jedes Mal ein weiterer Prozess gestartet -> mehrere Prozesse
+                    #        steuerten dasselbe Auto und schrieben doppelte Dateien.
+                    if v.color in control_processes and control_processes[v.color].is_alive():
+                        print(f"Fahrzeug '{v.color}' wieder erkannt -> vorhandener Steuerprozess übernimmt (kein Duplikat).")
+                        continue
                     # #VORSAGE: nur COLLECT_VEHICLE_COLOR nimmt auf (und bekommt die Frontkamera), andere fahren normal mit Lidar
                     record_this = (v.color == COLLECT_VEHICLE_COLOR) and shm_front_pointer is not None
                     if not record_this:  # #VORSAGE: deutlich melden, wenn dieses Fahrzeug NICHT aufgenommen wird
@@ -751,7 +949,7 @@ def main():
                                                          args=(d, v.color, 1.0/frames_per_seconds,
                                                                shm_front_pointer if record_this else None,
                                                                shm_front_counter if record_this else None,
-                                                               CNN_MODEL_PATH if COLLECT_MODE == "dagger" else None,
+                                                               CNN_MODEL_PATH if CNN_DRIVES else None,
                                                                record_this))
                     control_processes[v.color].start()
                 else:

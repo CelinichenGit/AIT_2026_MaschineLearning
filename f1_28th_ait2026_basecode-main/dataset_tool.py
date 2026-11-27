@@ -34,7 +34,7 @@ EXTRA_KEYS = ["actual_speed_mps", "executed_steer_rad", "pos_x", "pos_y", "yaw",
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("command", choices=["stats", "view", "export"])
-    p.add_argument("--data-dir", default="cnn_data_vorhersage")#VORSAGE
+    p.add_argument("--data-dir", default="cnn_data_real")#VORSAGE
     p.add_argument("--file", default=None, help="single .npz file instead of the whole data dir")
     p.add_argument("--out", default="cnn_export", help="export: output directory")
     p.add_argument("--every", type=int, default=1, help="export: only every n-th frame")

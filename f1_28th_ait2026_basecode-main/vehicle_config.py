@@ -1,6 +1,6 @@
 #ip addresses of vehicles
 vehicles = {
-        "yellow": {
+        "yellow": { #Yellow Point: light-blue Vehicle
             "ip": "10.134.137.45",
             "port": 6446,
             "delay_ms": 120,        #Delay für Fahrzeug einstellen
@@ -12,12 +12,13 @@ vehicles = {
             "rear_axle_offset_m" : 0.065, #rear-center offset of the center of rear axle (where the black Dot on the vehicle is)
             "height_over_ground_white_marker_m": 0.025,
             "height_over_ground_colored_marker_m": 0.042,
-            "steering_measurements" : [(180, -30.03368485153285), (130, -16.505033343421694), (90, -0.37852008175802687), (50, 20.537214781612377), (10, 27.63541446470892)],
+            "steering_measurements" : [(180, -29.38158398740409), (130, -23.86067306437482), (90, -5.061562118399852), (50, 8.53738643672137), (10, 24.845388004698254)],
+            #"steering_measurements" : [(180, -30.03368485153285), (130, -16.505033343421694), (90, -0.37852008175802687), (50, 20.537214781612377), (10, 27.63541446470892)],
             "max_steering_angle": 27,  #links
             "min_steering_angle": -27, #rechts
             "min_motor_value" : 60,         #min motor voltage (0-255) to get the vehicle moving
-            "max_motor_value" : 110,        #max motor voltage (0-255)
-            "speed_factor": 1.0,
+            "max_motor_value" : 100,        #max motor voltage (0-255)
+            "speed_factor": 0.75,
             "lidar_field_of_view_deg": 160, 
             "lidar_numRays": 60, 
             "lidar_rayLength_m" : 1.0
@@ -56,12 +57,13 @@ vehicles = {
             "rear_axle_offset_m" : 0.065, #rear-center offset of the center of rear axle (where the black Dot on the vehicle is)
             "height_over_ground_white_marker_m": 0.025,
             "height_over_ground_colored_marker_m": 0.042,
-            "steering_measurements" : [(180, -36.10199464583294), (130, -22.731846515508135),(90, -2.0265115567479937), (50, 10.775777232439044), (10, 24.971953998963805),],
-            "max_steering_angle": 30,  #links
-            "min_steering_angle": -30, #rechts
+            "steering_measurements" : [(180, -38.4202),(130, -21.3584),(90, 5.04949),(50, 27.3576),(10, 48.3251)],
+            #"steering_measurements" : [(180, -36.10199464583294), (130, -22.731846515508135),(90, -2.0265115567479937), (50, 10.775777232439044), (10, 24.971953998963805),],
+            "max_steering_angle": 25,  #links
+            "min_steering_angle": -25, #rechts
             "min_motor_value" : 40,         #min motor voltage (0-255) to get the vehicle moving
-            "max_motor_value" : 110,        #max motor voltage (0-255)
-            "speed_factor": 1.0,
+            "max_motor_value" : 100,        #max motor voltage (0-255)
+            "speed_factor": 1,
             "lidar_field_of_view_deg": 160, 
             "lidar_numRays": 80, 
             "lidar_rayLength_m" : 1.0
